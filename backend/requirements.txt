@@ -1,0 +1,15 @@
+playwright==1.40.0
+beautifulsoup4==4.12.2
+python-dotenv==1.0.0
+asyncio
+flask
+openai
+pinecone
+requests
+flask-cors
+dirtyjson
+scikit-image
+sentence-transformers
+scipy
+numpy
+imagehash

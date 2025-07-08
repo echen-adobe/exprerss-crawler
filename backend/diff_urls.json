@@ -1,0 +1,330 @@
+{
+    "express_create_banner_event.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_online-journal.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_avatar.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_meme_text.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_banner_graduation.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_banner_graphic.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_invoice.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_letter_cover.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_banner_website.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_banner_ad.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_card_thank-you-for-your-business.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_menu_dinner.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_photo-collage_family.png": {
+        "diff": 4,
+        "diff_path": "./qa/diff/diff_express_create_photo-collage_family.png",
+        "has_significant_differences": true,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_flyer_talent-show.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_comic-strip.png": {
+        "diff": 5,
+        "diff_path": "./qa/diff/diff_express_create_comic-strip.png",
+        "has_significant_differences": true,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_card_christmas_photo.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_flyer_event.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_brochure_tri-fold.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_photo-collage_instagram.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_ambassadors_list.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_business-card_student.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_banner_twitch_video-player.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_cover_mixtape.png": {
+        "diff": 3,
+        "diff_path": "./qa/diff/diff_express_create_cover_mixtape.png",
+        "has_significant_differences": true,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_business-card_virtual.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_logo.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_label_mug.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_brochure_travel.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_photo-collage_birthday.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_banner_vertical.png": {
+        "diff": 3,
+        "diff_path": "./qa/diff/diff_express_create_banner_vertical.png",
+        "has_significant_differences": true,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_cover_cd.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_label_clothing.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_photo-collage.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_banner_vinyl.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_photo-collage_facebook.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_cover_vogue.png": {
+        "diff": 3,
+        "diff_path": "./qa/diff/diff_express_create_cover_vogue.png",
+        "has_significant_differences": true,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_online-portfolio.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_logo_volleyball.png": {
+        "diff": 2,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": true,
+        "experimental_cropped": false
+    },
+    "express_create_label_beer.png": {
+        "diff": 0,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": false
+    },
+    "express_create_certificate.png": {
+        "diff": 1,
+        "diff_path": "",
+        "has_significant_differences": false,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "express_create_banner_youtube-channel-art_game.png": {
+        "diff": 4,
+        "diff_path": "./qa/diff/diff_express_create_banner_youtube-channel-art_game.png",
+        "has_significant_differences": true,
+        "hamming_threshold_used": 2,
+        "control_cropped": false,
+        "experimental_cropped": true
+    },
+    "metrics": {
+        "0": 17,
+        "2": 10,
+        "1": 7,
+        "4": 2,
+        "5": 1,
+        "3": 3
+    }
+}

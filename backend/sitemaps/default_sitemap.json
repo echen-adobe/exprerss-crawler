@@ -1,0 +1,6 @@
+{
+    "experimental_branch_host" : "https://stage--express-milo--adobecom.aem.live",
+    "control_branch_host" : "https://main--express-milo--adobecom.aem.live",
+    "urls" : [],
+    "sitemap_url" : "https://www.adobe.com/express/sitemap.xml"
+}

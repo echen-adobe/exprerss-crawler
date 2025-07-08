@@ -1,0 +1,8 @@
+{
+    "experimental_branch_host" : "https://ax-columns-video-height-fix--express-milo--adobecom.aem.live",
+    "control_branch_host" : "https://stage--express-milo--adobecom.aem.live",
+    "urls" : [
+       "/express/feature/image/remove-background",
+       "/express/"
+    ]
+}
