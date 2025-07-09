@@ -121,15 +121,15 @@ async def main(sitemap_file):
         await stealth_async(initial_context)
         
         # Open a page for manual login
-        page = await initial_context.new_page()
-        print("\nPlease complete the login process in the browser window that just opened.")
-        print("Press Enter in this terminal after you have completed the login.\n")
+        # page = await initial_context.new_page()
+        # print("\nPlease complete the login process in the browser window that just opened.")
+        # print("Press Enter in this terminal after you have completed the login.\n")
         
         # Wait for user to press Enter
-        input()
+        # input()
         
-        # Close the initial context after login
-        await initial_context.close()
+        # # Close the initial context after login
+        # await initial_context.close()
         
         # Create two persistent contexts - one for control and one for experimental
         control_context = await browser.new_context(**context_options)
@@ -137,12 +137,13 @@ async def main(sitemap_file):
         await stealth_async(control_context)
         await stealth_async(experimental_context)
         control_urls, experimental_urls = await get_urls(control_context,sitemap_file)
-        limit = 10
-        batch_size = 1
+        limit = 30
+        batch_size = 3
         
         # Initialize loggers
         loggers = {
-            'screenshot': ScreenshotLogger(),
+            'source': SourceLogger(),
+            # 'screenshot': ScreenshotLogger(),
             'failure': FailureLogger()
         }
         
