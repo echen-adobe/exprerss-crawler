@@ -26,10 +26,10 @@ async def get_sitemap(page, sitemap_url):
     page_content = await page.content()
     urls = []
     for line in page_content.split('\n'):
-        if 'href="' in line:
-            start = line.find('href="') + 6
-            end = line.find('"', start)
-            url = line[start:end]
+        if 'loc' in line:
+            start = line.find('<loc>') + 5
+            end = line.find('</loc>', start)
+            url = line[start:end]   
             if url.startswith("https://www.adobe.com/express/"):
                 urls.append(url)
     return urls
@@ -118,14 +118,18 @@ class TabWorker:
                     break
                     
                 url, environment = url_data
+                
+                # Check if this URL matches our worker's context
+                
                 await self.process_single_url(url, environment)
                 self.crawler_shepherd.completed_tasks += 1
                 print(f"Worker {self.worker_id} completed task number {self.crawler_shepherd.completed_tasks}")
+                    
             except asyncio.TimeoutError:
                 # No URLs in queue, continue waiting
                 continue
             except Exception as e:
-                print(f"Worker {self.worker_id} error: {e}")
+                print(f"Worker {self.worker_id} error: {e}")    
                 
     async def process_single_url(self, url: str, environment: str):
         try:
@@ -167,11 +171,11 @@ class ConcurrentCrawler:
         self.loggers = loggers
         self.max_tabs = max_tabs
         self.queue_refill_threshold = queue_refill_threshold
-        self.control_queue = Queue()
-        self.experimental_queue = Queue()
-        self.control_workers: List[TabWorker] = []
-        self.experimental_workers: List[TabWorker] = []
+        self.url_queue = Queue()  # Single unified queue
+        self.workers: List[TabWorker] = []
         self.completed_tasks = 0
+        self.control_host = ""
+        self.experimental_host = ""
         
     async def initialize_workers(self, context_options: dict):
         # Create control context and workers
@@ -180,24 +184,19 @@ class ConcurrentCrawler:
         
         for i in range(self.max_tabs):
             page = await self.control_context.new_page()
-            worker = TabWorker(i, page, self.control_queue, self.loggers, self)
-            self.control_workers.append(worker)
-            
-        # Create experimental context and workers
-        self.experimental_context = await self.browser.new_context(**context_options)
-        await stealth_async(self.experimental_context)
-        
-        for i in range(self.max_tabs):
-            page = await self.experimental_context.new_page()
-            worker = TabWorker(i + self.max_tabs, page, self.experimental_queue, self.loggers, self)
-            self.experimental_workers.append(worker)
+            worker = TabWorker(i, page, self.url_queue, self.loggers, self)
+            self.workers.append(worker)
             
     async def crawl_urls(self, control_urls: List[str], experimental_urls: List[str], limit: int = 30):
+        # Set host information for worker context determination
+        if control_urls:
+            self.control_host = control_urls[0].split('/')[2]
+        if experimental_urls:
+            self.experimental_host = experimental_urls[0].split('/')[2]
+            
         # Start worker tasks
         worker_tasks = []
-        for worker in self.control_workers:
-            worker_tasks.append(asyncio.create_task(worker.process_urls()))
-        for worker in self.experimental_workers:
+        for worker in self.workers:
             worker_tasks.append(asyncio.create_task(worker.process_urls()))
             
         # URL feeder task
@@ -209,44 +208,35 @@ class ConcurrentCrawler:
         await feeder_task
         
         # Send poison pills to stop workers
-        for _ in self.control_workers:
-            await self.control_queue.put(None)
-        for _ in self.experimental_workers:
-            await self.experimental_queue.put(None)
+        for _ in self.workers:
+            await self.url_queue.put(None)
             
         # Wait for all workers to complete
         await asyncio.gather(*worker_tasks)
         
     async def _feed_urls(self, control_urls: List[str], experimental_urls: List[str]):
-        control_index = 0
-        experimental_index = 0
+        # Combine all URLs into a single list
+        all_urls = []
+        for url in control_urls:
+            all_urls.append((url, 'control'))
+        for url in experimental_urls:
+            all_urls.append((url, 'experimental'))
         
-        while control_index < len(control_urls) or experimental_index < len(experimental_urls):
-            # Check control queue size and refill if needed
-            if self.control_queue.qsize() < self.queue_refill_threshold and control_index < len(control_urls):
-                # Add up to queue_refill_threshold URLs
-                for _ in range(min(self.queue_refill_threshold, len(control_urls) - control_index)):
-                    await self.control_queue.put((control_urls[control_index], 'control'))
-                    control_index += 1
-                    
-            # Check experimental queue size and refill if needed
-            if self.experimental_queue.qsize() < self.queue_refill_threshold and experimental_index < len(experimental_urls):
-                # Add up to queue_refill_threshold URLs
-                for _ in range(min(self.queue_refill_threshold, len(experimental_urls) - experimental_index)):
-                    await self.experimental_queue.put((experimental_urls[experimental_index], 'experimental'))
-                    experimental_index += 1
+        while len(all_urls) > 0:
+            if self.url_queue.qsize() < self.queue_refill_threshold: 
+                await self.url_queue.put(all_urls.pop(0)) 
                     
             # Small delay to avoid busy waiting
             await asyncio.sleep(0.5)
             
     async def cleanup(self):
         # Stop all workers
-        for worker in self.control_workers + self.experimental_workers:
+        for worker in self.workers:
             worker.stop()
             
         # Close contexts
         await self.control_context.close()
-        await self.experimental_context.close()
+        #await self.experimental_context.close()
 
 async def main(sitemap_file, max_tabs=5, queue_refill_threshold=10, retry_mode=False, failed_urls_path='./qa/failed_urls.json'):
     async with async_playwright() as p:
@@ -292,7 +282,7 @@ async def main(sitemap_file, max_tabs=5, queue_refill_threshold=10, retry_mode=F
             await stealth_async(initial_context)
             control_urls, experimental_urls = await get_urls(initial_context, sitemap_file)
             await initial_context.close()
-            limit = 10
+            limit = 100
         
         # Initialize loggers
         loggers = {
