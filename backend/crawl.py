@@ -9,6 +9,8 @@ from loggers.failure_logger import FailureLogger
 from loggers.logger import Logger
 import random 
 from playwright_stealth import stealth_sync , stealth_async
+from typing import List, Dict, Optional
+from asyncio import Queue
 
 load_dotenv()
 
@@ -41,6 +43,20 @@ async def get_urls(browser, sitemap_file):
         urls = await get_sitemap(page, config['sitemap_url'])
         await page.close()
     return await get_urls_for_environment(urls, config['control_branch_host']), await get_urls_for_environment(urls, config['experimental_branch_host'])
+
+async def load_failed_urls(failed_urls_path='./qa/failed_urls.json'):
+    """Load failed URLs from previous runs"""
+    try:
+        with open(failed_urls_path, 'r') as f:
+            failed_data = json.load(f)
+            
+        control_urls = [item['url'] for item in failed_data if item['environment'] == 'control']
+        experimental_urls = [item['url'] for item in failed_data if item['environment'] == 'experimental']
+        
+        return control_urls, experimental_urls
+    except FileNotFoundError:
+        print(f"No failed URLs file found at {failed_urls_path}")
+        return [], []
 
 async def get_urls_for_environment(urls, environment):
     environment_urls = []
@@ -84,7 +100,155 @@ async def process_page_with_context(context, url, environment, loggers: dict[str
     finally:
         await page.close()
 
-async def main(sitemap_file):
+class TabWorker:
+    def __init__(self, worker_id: int, page, url_queue: Queue, loggers: dict[str, Logger], crawler_shepherd: 'ConcurrentCrawler'):
+        self.worker_id = worker_id
+        self.page = page
+        self.url_queue = url_queue
+        self.loggers = loggers
+        self.is_running = True
+        self.crawler_shepherd = crawler_shepherd
+        
+    async def process_urls(self):
+        while self.is_running:
+            try:
+                # Get URL from queue with timeout
+                url_data = await asyncio.wait_for(self.url_queue.get(), timeout=5.0)
+                if url_data is None:  # Poison pill to stop worker
+                    break
+                    
+                url, environment = url_data
+                await self.process_single_url(url, environment)
+                self.crawler_shepherd.completed_tasks += 1
+                print(f"Worker {self.worker_id} completed task number {self.crawler_shepherd.completed_tasks}")
+            except asyncio.TimeoutError:
+                # No URLs in queue, continue waiting
+                continue
+            except Exception as e:
+                print(f"Worker {self.worker_id} error: {e}")
+                
+    async def process_single_url(self, url: str, environment: str):
+        try:
+            # Clear any existing state
+            await self.page.evaluate("document.documentElement.style.setProperty('--animation-speed', '0s')")
+            await self.page.evaluate("document.documentElement.style.setProperty('transition', 'none')")
+            await asyncio.sleep(random.randint(1, 5) / 10.0)
+            
+            # Initialize all loggers for this page
+            for logger in self.loggers.values():
+                await logger.init_on_page(self.page, url)
+            
+            # Navigate to URL
+            await self.page.goto(url)
+            await asyncio.sleep(random.randint(1, 5))
+            
+            await self.page.wait_for_load_state('networkidle', timeout=45000)
+            
+            # Log data for this page with all loggers
+            for logger in self.loggers.values():
+                await logger.log(self.page, url, environment)
+                
+            print(f"Worker {self.worker_id} processed {url}")
+            
+        except Exception as e:
+            # On error, only call failure logger
+            if 'failure' in self.loggers:
+                import traceback
+                stack_trace = traceback.format_exc()
+                await self.loggers['failure'].log(self.page, url, environment, error=e, stack_trace=stack_trace)
+            print(f"Worker {self.worker_id} error processing {url}: {e}")
+            
+    def stop(self):
+        self.is_running = False
+
+class ConcurrentCrawler:
+    def __init__(self, browser, loggers: dict[str, Logger], max_tabs: int = 5, queue_refill_threshold: int = 10):
+        self.browser = browser
+        self.loggers = loggers
+        self.max_tabs = max_tabs
+        self.queue_refill_threshold = queue_refill_threshold
+        self.control_queue = Queue()
+        self.experimental_queue = Queue()
+        self.control_workers: List[TabWorker] = []
+        self.experimental_workers: List[TabWorker] = []
+        self.completed_tasks = 0
+        
+    async def initialize_workers(self, context_options: dict):
+        # Create control context and workers
+        self.control_context = await self.browser.new_context(**context_options)
+        await stealth_async(self.control_context)
+        
+        for i in range(self.max_tabs):
+            page = await self.control_context.new_page()
+            worker = TabWorker(i, page, self.control_queue, self.loggers, self)
+            self.control_workers.append(worker)
+            
+        # Create experimental context and workers
+        self.experimental_context = await self.browser.new_context(**context_options)
+        await stealth_async(self.experimental_context)
+        
+        for i in range(self.max_tabs):
+            page = await self.experimental_context.new_page()
+            worker = TabWorker(i + self.max_tabs, page, self.experimental_queue, self.loggers, self)
+            self.experimental_workers.append(worker)
+            
+    async def crawl_urls(self, control_urls: List[str], experimental_urls: List[str], limit: int = 30):
+        # Start worker tasks
+        worker_tasks = []
+        for worker in self.control_workers:
+            worker_tasks.append(asyncio.create_task(worker.process_urls()))
+        for worker in self.experimental_workers:
+            worker_tasks.append(asyncio.create_task(worker.process_urls()))
+            
+        # URL feeder task
+        feeder_task = asyncio.create_task(
+            self._feed_urls(control_urls[:limit], experimental_urls[:limit])
+        )
+        
+        # Wait for feeder to complete
+        await feeder_task
+        
+        # Send poison pills to stop workers
+        for _ in self.control_workers:
+            await self.control_queue.put(None)
+        for _ in self.experimental_workers:
+            await self.experimental_queue.put(None)
+            
+        # Wait for all workers to complete
+        await asyncio.gather(*worker_tasks)
+        
+    async def _feed_urls(self, control_urls: List[str], experimental_urls: List[str]):
+        control_index = 0
+        experimental_index = 0
+        
+        while control_index < len(control_urls) or experimental_index < len(experimental_urls):
+            # Check control queue size and refill if needed
+            if self.control_queue.qsize() < self.queue_refill_threshold and control_index < len(control_urls):
+                # Add up to queue_refill_threshold URLs
+                for _ in range(min(self.queue_refill_threshold, len(control_urls) - control_index)):
+                    await self.control_queue.put((control_urls[control_index], 'control'))
+                    control_index += 1
+                    
+            # Check experimental queue size and refill if needed
+            if self.experimental_queue.qsize() < self.queue_refill_threshold and experimental_index < len(experimental_urls):
+                # Add up to queue_refill_threshold URLs
+                for _ in range(min(self.queue_refill_threshold, len(experimental_urls) - experimental_index)):
+                    await self.experimental_queue.put((experimental_urls[experimental_index], 'experimental'))
+                    experimental_index += 1
+                    
+            # Small delay to avoid busy waiting
+            await asyncio.sleep(0.5)
+            
+    async def cleanup(self):
+        # Stop all workers
+        for worker in self.control_workers + self.experimental_workers:
+            worker.stop()
+            
+        # Close contexts
+        await self.control_context.close()
+        await self.experimental_context.close()
+
+async def main(sitemap_file, max_tabs=5, queue_refill_threshold=10, retry_mode=False, failed_urls_path='./qa/failed_urls.json'):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=False,  # Changed to False to allow manual login
@@ -107,43 +271,33 @@ async def main(sitemap_file):
                 'Upgrade-Insecure-Requests': '1',
                 'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
                 'Sec-Ch-Ua-Platform': '"macOS"',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
                 'Sec-Fetch-User': '?1'
             },
             'bypass_csp': True,  # Bypass Content Security Policy
             'ignore_https_errors': True  # Ignore HTTPS errors
         }
         
-        # Create initial context for manual login
-        initial_context = await browser.new_context(**context_options)
-        await stealth_async(initial_context)
-        
-        # Open a page for manual login
-        # page = await initial_context.new_page()
-        # print("\nPlease complete the login process in the browser window that just opened.")
-        # print("Press Enter in this terminal after you have completed the login.\n")
-        
-        # Wait for user to press Enter
-        # input()
-        
-        # # Close the initial context after login
-        # await initial_context.close()
-        
-        # Create two persistent contexts - one for control and one for experimental
-        control_context = await browser.new_context(**context_options)
-        experimental_context = await browser.new_context(**context_options)
-        await stealth_async(control_context)
-        await stealth_async(experimental_context)
-        control_urls, experimental_urls = await get_urls(control_context,sitemap_file)
-        limit = 30
-        batch_size = 3
+        # Get URLs based on mode
+        if retry_mode:
+            print("Running in retry mode - loading failed URLs...")
+            control_urls, experimental_urls = await load_failed_urls(failed_urls_path)
+            if not control_urls and not experimental_urls:
+                print("No failed URLs to retry.")
+                return
+            print(f"Found {len(control_urls)} control and {len(experimental_urls)} experimental URLs to retry")
+            limit = len(control_urls) + len(experimental_urls)  # Process all failed URLs
+        else:
+            # Create initial context for getting URLs
+            initial_context = await browser.new_context(**context_options)
+            await stealth_async(initial_context)
+            control_urls, experimental_urls = await get_urls(initial_context, sitemap_file)
+            await initial_context.close()
+            limit = 10
         
         # Initialize loggers
         loggers = {
             'source': SourceLogger(),
-            # 'screenshot': ScreenshotLogger(),
+            'screenshot': ScreenshotLogger(),
             'failure': FailureLogger()
         }
         
@@ -152,23 +306,26 @@ async def main(sitemap_file):
             if hasattr(logger, 'initialize') and callable(logger.initialize):
                 await logger.initialize()
         
+        # Create concurrent crawler
+        crawler = ConcurrentCrawler(
+            browser=browser,
+            loggers=loggers,
+            max_tabs=max_tabs,
+            queue_refill_threshold=queue_refill_threshold
+        )
+        
         try:
-            for i in range(0, min(limit, len(control_urls)), batch_size):
-                control_batch = control_urls[i:i + batch_size]
-                experimental_batch = experimental_urls[i:i + batch_size]
-                control_tasks = [
-                    process_page_with_context(control_context, url, 'control', loggers) 
-                    for url in control_batch
-                ]
-                experimental_tasks = [
-                    process_page_with_context(experimental_context, url, 'experimental', loggers) 
-                    for url in experimental_batch
-                ]
-                await asyncio.gather(*(control_tasks + experimental_tasks))
-                print(f"Completed batch {i//batch_size + 1}")
-                await asyncio.sleep(3)
-                control_context = await browser.new_context(**context_options)
-                experimental_context = await browser.new_context(**context_options)
+            # Initialize worker tabs
+            await crawler.initialize_workers(context_options)
+            
+            # Start crawling
+            if retry_mode:
+                print(f"Starting retry crawl with {max_tabs} tabs per context...")
+                # Process failed URLs in smaller batches
+                await crawler.crawl_urls(control_urls, experimental_urls, limit)
+            else:
+                print(f"Starting concurrent crawl with {max_tabs} tabs per context...")
+                await crawler.crawl_urls(control_urls, experimental_urls, limit)
             
             # Write all logs at the end
             for logger in loggers.values():
@@ -177,20 +334,21 @@ async def main(sitemap_file):
                 else:
                     logger.write_logs()
                     
-            # Cleanup loggers
-            for logger in loggers.values():
-                if hasattr(logger, 'cleanup') and callable(logger.cleanup):
-                    await logger.cleanup()
         finally:
-            # Clean up browser contexts
-            await control_context.close()
-            await experimental_context.close()
+            # Clean up crawler and browser
+            await crawler.cleanup()
             await browser.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Web crawler for QA testing')
     parser.add_argument('--sitemap', type=str, default='./sitemaps/default_sitemap.json',
                       help='Path to the sitemap configuration file (default: default_sitemap.json)')
+    parser.add_argument('--max-tabs', type=int, default=5,
+                      help='Maximum number of tabs per context (default: 5)')
+    parser.add_argument('--queue-threshold', type=int, default=10,
+                      help='Queue refill threshold (default: 10)')
+    parser.add_argument('--retry', action='store_true',
+                      help='Retry failed URLs from previous run')
     
     args = parser.parse_args()
     
@@ -199,5 +357,6 @@ if __name__ == "__main__":
     else:
         print("Using default sitemap file: default_sitemap.json")
     
+    print(f"Configuration: max_tabs={args.max_tabs}, queue_threshold={args.queue_threshold}")
     print("Starting crawler...")
-    asyncio.run(main(args.sitemap))
+    asyncio.run(main(args.sitemap, args.max_tabs, args.queue_threshold, args.retry))

@@ -26,7 +26,7 @@ class ScreenshotLogger(Logger):
 
     def write_logs(self):
         # No need to write logs as screenshots are saved immediately
-        print(f"Total screenshots taken: {self.screenshot_count}")
+        print(f"Total DOM screenshots taken: {self.screenshot_count}")
 
     def get_screenshot_count(self):
         return self.screenshot_count 
