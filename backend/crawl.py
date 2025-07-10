@@ -31,7 +31,7 @@ async def get_sitemap(page, sitemap_url):
             end = line.find('</loc>', start)
             url = line[start:end]   
             if url.startswith("https://www.adobe.com/express/"):
-                urls.append(url)
+                urls.append(url + '?martech=off')
     return urls
 
 async def get_urls(browser, sitemap_file):
@@ -119,8 +119,6 @@ class TabWorker:
                     
                 url, environment = url_data
                 
-                # Check if this URL matches our worker's context
-                
                 await self.process_single_url(url, environment)
                 self.crawler_shepherd.completed_tasks += 1
                 print(f"Worker {self.worker_id} completed task number {self.crawler_shepherd.completed_tasks}")
@@ -129,13 +127,14 @@ class TabWorker:
                 # No URLs in queue, continue waiting
                 continue
             except Exception as e:
-                print(f"Worker {self.worker_id} error: {e}")    
+                print(f"Worker {self.worker_id} error: {e}")
                 
     async def process_single_url(self, url: str, environment: str):
         try:
             # Clear any existing state
             await self.page.evaluate("document.documentElement.style.setProperty('--animation-speed', '0s')")
             await self.page.evaluate("document.documentElement.style.setProperty('transition', 'none')")
+            await self.page.evaluate("if (window.gc) window.gc()")
             await asyncio.sleep(random.randint(1, 5) / 10.0)
             
             # Initialize all loggers for this page
@@ -187,6 +186,15 @@ class ConcurrentCrawler:
             worker = TabWorker(i, page, self.url_queue, self.loggers, self)
             self.workers.append(worker)
             
+        # Create experimental context and workers
+        self.experimental_context = await self.browser.new_context(**context_options)
+        await stealth_async(self.experimental_context)
+        
+        for i in range(self.max_tabs):
+            page = await self.experimental_context.new_page()
+            worker = TabWorker(i + self.max_tabs, page, self.url_queue, self.loggers, self)
+            self.workers.append(worker)
+            
     async def crawl_urls(self, control_urls: List[str], experimental_urls: List[str], limit: int = 30):
         # Set host information for worker context determination
         if control_urls:
@@ -234,9 +242,31 @@ class ConcurrentCrawler:
         for worker in self.workers:
             worker.stop()
             
+        # Close all pages first
+        for worker in self.workers:
+            try:
+                if not worker.page.is_closed():
+                    await worker.page.close()
+            except Exception as e:
+                print(f"Error closing page for worker {worker.worker_id}: {e}")
+                
+        # Clear worker references
+        self.workers.clear()
+            
         # Close contexts
-        await self.control_context.close()
-        #await self.experimental_context.close()
+        try:
+            await self.control_context.close()
+        except Exception as e:
+            print(f"Error closing control context: {e}")
+            
+        try:
+            await self.experimental_context.close()
+        except Exception as e:
+            print(f"Error closing experimental context: {e}")
+            
+        # Clear context references
+        self.control_context = None
+        self.experimental_context = None
 
 async def main(sitemap_file, max_tabs=5, queue_refill_threshold=10, retry_mode=False, failed_urls_path='./qa/failed_urls.json'):
     async with async_playwright() as p:
@@ -327,6 +357,15 @@ async def main(sitemap_file, max_tabs=5, queue_refill_threshold=10, retry_mode=F
         finally:
             # Clean up crawler and browser
             await crawler.cleanup()
+            
+            # Clean up logger resources
+            for logger in loggers.values():
+                if hasattr(logger, 'cleanup'):
+                    await logger.cleanup() if asyncio.iscoroutinefunction(logger.cleanup) else logger.cleanup()
+                    
+            # Clear logger references
+            loggers.clear()
+            
             await browser.close()
 
 if __name__ == "__main__":
